@@ -34,7 +34,7 @@ contract HalbornNFT is Initializable, ERC721Upgradeable, UUPSUpgradeable, Ownabl
     }
 
     function mintAirdrops(uint256 id, bytes32[] calldata merkleProof) external {
-        require(_exists(id), "Token already minted");
+        require(!_exists(id), "Token already minted"); // fix
         bytes32 node = keccak256(abi.encodePacked(msg.sender, id));
         bool isValidProof = MerkleProofUpgradeable.verifyCalldata(merkleProof, merkleRoot, node);
         require(isValidProof, "Invalid proof.");
@@ -53,7 +53,8 @@ contract HalbornNFT is Initializable, ERC721Upgradeable, UUPSUpgradeable, Ownabl
     }
 
     function withdrawETH(uint256 amount) external onlyOwner {
-        payable(owner()).transfer(amount);
+        (bool success, ) = payable(owner()).call{value: amount}(""); // fix
+        require(success, "Transfer failed");
     }
 
     function _authorizeUpgrade(address) internal override {}

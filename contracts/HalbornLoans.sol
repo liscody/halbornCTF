@@ -6,8 +6,9 @@ import {HalbornNFT} from "./HalbornNFT.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {MulticallUpgradeable} from "./libraries/Multicall.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC721/IERC721ReceiverUpgradeable.sol";
 
-contract HalbornLoans is Initializable, UUPSUpgradeable, MulticallUpgradeable {
+contract HalbornLoans is Initializable, UUPSUpgradeable, MulticallUpgradeable, IERC721ReceiverUpgradeable {
     HalbornToken public token;
     HalbornNFT public nft;
 
@@ -30,8 +31,6 @@ contract HalbornLoans is Initializable, UUPSUpgradeable, MulticallUpgradeable {
     }
 
     function depositNFTCollateral(uint256 id) external {
-        require(nft.ownerOf(id) == msg.sender, "Caller is not the owner of the NFT");
-
         nft.safeTransferFrom(msg.sender, address(this), id);
 
         totalCollateral[msg.sender] += collateralPrice;
@@ -48,7 +47,7 @@ contract HalbornLoans is Initializable, UUPSUpgradeable, MulticallUpgradeable {
     }
 
     function getLoan(uint256 amount) external {
-        require(totalCollateral[msg.sender] - usedCollateral[msg.sender] < amount, "Not enough collateral");
+        require(totalCollateral[msg.sender] - usedCollateral[msg.sender] >= amount, "Not enough collateral");
         usedCollateral[msg.sender] += amount;
         token.mintToken(msg.sender, amount);
     }
@@ -56,9 +55,17 @@ contract HalbornLoans is Initializable, UUPSUpgradeable, MulticallUpgradeable {
     function returnLoan(uint256 amount) external {
         require(usedCollateral[msg.sender] >= amount, "Not enough collateral");
         require(token.balanceOf(msg.sender) >= amount);
-        usedCollateral[msg.sender] += amount;
+        usedCollateral[msg.sender] -= amount;
         token.burnToken(msg.sender, amount);
     }
 
     function _authorizeUpgrade(address) internal override {}
+
+    /**
+     * @notice See {IERC721Receiver-onERC721Received}.
+     * @notice Always returns `IERC721Receiver.onERC721Received.selector`.
+     */
+    function onERC721Received(address, address, uint256, bytes memory) public virtual override returns (bytes4) {
+        return IERC721ReceiverUpgradeable.onERC721Received.selector;
+    }
 }
